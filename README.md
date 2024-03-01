@@ -14,6 +14,15 @@ Goals:
 
 The tool is not compatible with tables that include empty `ArrayStructExpressions`. These should be converted to missing prior to analysis (refer to the example below).
 
+## Installation
+
+`pip install -r requirements-dev.lock`
+
+or 
+
+`rye sync` (rye with v0.16.0)
+
+
 ## Example
 
 ```python

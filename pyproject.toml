@@ -3,7 +3,7 @@ name = "hail-missing"
 version = "0.1.0"
 description = "Add your description here"
 authors = [
-    { name = "Matthew Solomonson", email = "ggmatt@gmail.com" }
+    { name = "Matthew Solomonson", email = "msolomon@broadinstitute.org" }
 ]
 dependencies = [
     "hail>=0.2.128",
@@ -11,7 +11,7 @@ dependencies = [
     "loguru>=0.7.2",
 ]
 readme = "README.md"
-requires-python = ">= 3.12"
+requires-python = ">= 3.10"
 
 [build-system]
 requires = ["hatchling"]
