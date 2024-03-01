@@ -30,6 +30,32 @@ def struct_to_dict(struct: Any) -> Any:
 
 
 def count_missing_fields_with_keys(ht) -> Dict:
+    """
+    Counts missing fields in a Hail Table and returns a dictionary with counts and keys of missing data.
+
+    Analyzes a Hail Table to identify missing data within its fields, including nested structures
+    and arrays of structures. Returns the counts of missing data and the corresponding keys where
+    the data is missing.
+
+    Args:
+        ht: The Hail Table to be analyzed for missing fields.
+
+    Returns:
+        A dictionary containing the counts of missing fields and the keys corresponding to
+        those fields. The keys are given in the form of a struct, which maps field names to
+        their missing counts and missing keys.
+
+    Example:
+        result = count_missing_fields_with_keys(hl_table)
+        print(result)
+        # Output: {'counts': {'field1': 0, 'field2': 10}, 'missing_keys': {'field2': ['key1', 'key2']}}
+
+    Raises:
+        HailUserError: If the operation encounters an index out of bounds error due to an
+        empty ArrayStructExpression. Ensure that such expressions are handled before calling
+        this function.
+    """
+
     def count_missing_and_keys(
         schema: hl.StructExpression,
         parent_missing=hl.bool(False),
@@ -132,6 +158,24 @@ def count_missing_fields_with_keys(ht) -> Dict:
 
 
 class MissingnessReport:
+    """
+    A class for generating a missingness report for a Hail Table.
+
+    This class analyzes a Hail Table to determine the presence of missing
+    data in its fields. It computes the count of missing values and their
+    percentage for each field, as well as the keys associated with rows
+    that contain missing values. Optionally, the report can be cached to
+    a specified path as a CSV file.
+
+    Attributes:
+        df (pd.DataFrame): DataFrame containing the missingness report.
+        ht (Optional[hl.Table]): The Hail Table being analyzed.
+
+    Methods:
+        __init__(self, ht: Optional[hl.Table], cache_path: Optional[Path]): Initializes the MissingnessReport instance.
+        _load_or_compute_df(self, cache_path: Optional[Path]): Loads the missingness report from cache or computes it.
+    """
+
     df: pd.DataFrame
     ht: Optional[hl.Table] = None
 
@@ -140,10 +184,39 @@ class MissingnessReport:
         ht: Optional[hl.Table],
         cache_path: Optional[Path] = None,
     ):
+        """
+        Initializes a MissingnessReport instance.
+
+        Args:
+            ht (Optional[hl.Table]): A Hail Table to analyze for missingness. Can be None if a cache_path is provided.
+            cache_path (Optional[Path]): A file path to a pre-computed missingness report CSV. If provided and the
+                                         file exists, loads the report from this file instead of computing it.
+
+        Raises:
+            Exception: If both ht and cache_path are None, or if the cache file does not exist.
+        """
         self.ht = ht
         self.df = self._load_or_compute_df(cache_path)
 
     def _load_or_compute_df(self, cache_path: Optional[Path]) -> pd.DataFrame:
+        """
+        Loads missingness report DataFrame from cache or computes it from the Hail Table.
+
+        This method will first attempt to load the report from a CSV file specified by cache_path.
+        If the cache_path is not provided or the file does not exist, it will compute the missingness
+        report from the Hail Table by counting the missing data in each field.
+
+        Args:
+            cache_path (Optional[Path]): Path to a CSV file where the missingness report is cached.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the missingness report.
+
+        Raises:
+            Exception: If the Hail Table is not available when the report needs to be computed.
+            ValueError: If the Hail Table contains an empty ArrayStructExpressions and indexing error occurs.
+            RuntimeError: If an unexpected error occurs during the computation of the missingness report.
+        """
         if cache_path and cache_path.exists():
             return pd.read_csv(str(cache_path))
 
@@ -152,7 +225,28 @@ class MissingnessReport:
                 "Could not find cached missingess and hail table is not available"
             )
 
-        missing = count_missing_fields_with_keys(self.ht)
+        assert self.ht
+
+        try:
+            missing = count_missing_fields_with_keys(self.ht)
+        except hl.utils.java.HailUserError as hail_err:
+            if "array index out of bounds" in str(hail_err):
+                logger.error(
+                    "HailUserError: Array index out of bounds. Make sure to replace empty "
+                    "ArrayStructExpressions with null before using this tool."
+                )
+                raise ValueError(
+                    "MissingnessReport encountered index out of bounds. Replace empty ArrayStructExpressions with null."
+                ) from hail_err
+            else:
+                raise
+        except Exception as exc:
+            logger.exception(
+                "An unexpected error occurred while counting missing fields."
+            )
+            raise RuntimeError(
+                "An error occurred during the analysis of missingness."
+            ) from exc
 
         df = pd.DataFrame(
             {
@@ -161,6 +255,7 @@ class MissingnessReport:
                 "missing_keys": list(missing["missing_keys"].values()),
             }
         )
+
         total_rows = self.ht.count()
 
         df["missing_percent"] = (df["counts"] / total_rows) * 100
@@ -172,20 +267,6 @@ class MissingnessReport:
             df.to_csv(str(cache_path), index=False)
 
         return df
-
-    @classmethod
-    def create(
-        cls,
-        ht: Optional[hl.Table] = None,
-        cache_path: Optional[Path] = None,
-    ):
-        """
-        Analyzes a Hail table for missingness in each field and returns a report with
-        counts of missing values for each field, the keys of the missing entries, and the
-        percentage of missing data for each field.
-        Optionally, the report can be cached to or read from a specified path.
-        """
-        return cls(ht, cache_path)
 
     def counts(self) -> Dict[str, int]:
         return self.df.set_index("field")["counts"].to_dict()

@@ -13,6 +13,7 @@ data = [
         "g": hl.call(1, 0),  # Genotype call
         "h": hl.locus("chr1", 10000, reference_genome="GRCh38"),  # Locus
         "i": [1, 2, 3],
+        "j": [],  # Empty array
         "complex_dictionary": {"key1": 5, "key2": 10},
         "k": {11, 12, 13},  # Set
         "detailed_struct": {
@@ -67,6 +68,7 @@ data = [
         "g": hl.call(0, 1),  # Genotype call
         "h": hl.locus("chr2", 20000, reference_genome="GRCh38"),  # Locus
         "i": [4, 5, 6],
+        "j": [{"in_empty_array": "hi"}],
         "complex_dictionary": {"key3": 15, "key4": None},
         "k": {14, 15, 16},  # Set
         "detailed_struct": {
@@ -125,7 +127,7 @@ data_type = (
     "array<struct{"
     "k1: str, k2: str, "
     "a: int32, b: str, c: bool, d: int64, e: float32, f: float64, "
-    "g: call, h: locus<GRCh38>, i: array<int32>, "
+    "g: call, h: locus<GRCh38>, i: array<int32>, j: array<struct{in_empty_array: str}>, "
     "complex_dictionary: dict<str, int32>, k: set<int32>, "
     "detailed_struct: struct{long_field1: int32, long_field2: str}, "
     "array_of_structs: array<struct{"
